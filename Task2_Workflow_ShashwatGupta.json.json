@@ -1,0 +1,282 @@
+{
+  "name": "Task2_Workflow_ShashwatGupta",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ],
+      "id": "07277c5f-433a-4961-8f2e-eb406713dcd3",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "const hits = $input.first().json.hits || [];\n\nreturn hits\n  .filter(h => h.title && typeof h.points === 'number')\n  .sort((a, b) => b.points - a.points)\n  .slice(0, 5)\n  .map(h => ({\n    json: {\n      title: h.title,\n      url: h.url || `https://news.ycombinator.com/item?id=${h.objectID}`,\n      points: h.points,\n      comments: h.num_comments,\n      author: h.author,\n      objectID: h.objectID\n    }\n  }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        -96
+      ],
+      "id": "d3337932-2128-483c-9b7e-a94c2a05944d",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "url": "=https://hn.algolia.com/api/v1/items/{{ $json.objectID }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        672,
+        -96
+      ],
+      "id": "c7ab1f80-3cac-4d13-baca-03142d9c2984",
+      "name": "HTTP Request1",
+      "executeOnce": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "0350b505-6c57-4e46-948a-0e69e13fac53",
+              "leftValue": "={{ $('Code in JavaScript').first().json.points }}",
+              "rightValue": 500,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        896,
+        -192
+      ],
+      "id": "79b03d9d-2b5a-422c-b7b1-03e5b0f7adb1",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "authentication": "webhook",
+        "content": "=⚠️ HN Brief workflow: the first API call (HackerNews search) failed.\nDetails: {{ $json.error ? JSON.stringify($json.error).slice(0, 300) : 'check n8n Executions tab' }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [
+        432,
+        32
+      ],
+      "id": "57f9eaa8-f048-4c51-a2fa-aa29f07ddfd0",
+      "name": "Alert: Search API Failed",
+      "webhookId": "49653cbe-3cea-4cc7-9f85-ec32313966a4",
+      "credentials": {
+        "discordWebhookApi": {
+          "id": "y3Lgh348bIk2IToM",
+          "name": "Discord Webhook account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "webhook",
+        "content": "=⚠️ HN Brief workflow: the second API call (top story details) failed.\nDetails: {{ $json.error ? JSON.stringify($json.error).slice(0, 300) : 'check n8n Executions tab' }}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [
+        896,
+        0
+      ],
+      "id": "994524ad-1461-42e4-80d6-b6f6ad1e9ec2",
+      "name": "Alert: Details API Failed",
+      "webhookId": "18a567e5-9fa5-4d75-8ae3-d4c46b4f62aa",
+      "credentials": {
+        "discordWebhookApi": {
+          "id": "y3Lgh348bIk2IToM",
+          "name": "Discord Webhook account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "webhook",
+        "content": "=📰 HN Morning Brief (quiet day)\n\nTop story today has only {{ $('Code in JavaScript').first().json.points }} points, below the 500 threshold.\n{{ $('Code in JavaScript').first().json.title }}\n{{ $('Code in JavaScript').first().json.url }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [
+        1168,
+        -48
+      ],
+      "id": "40ee4208-a843-46b3-9628-33eed9e3929f",
+      "name": "Discord Quiet Day ",
+      "webhookId": "4b2e93f3-6897-42f2-b33c-912108dab1d2",
+      "credentials": {
+        "discordWebhookApi": {
+          "id": "y3Lgh348bIk2IToM",
+          "name": "Discord Webhook account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "webhook",
+        "content": "=🔥 HN Morning Brief\n\nTop story: {{ $('Code in JavaScript').first().json.title }}\nPoints: {{ $('Code in JavaScript').first().json.points }} | Top-level comments: {{ $json.children.length }}\nLink: {{ $('Code in JavaScript').first().json.url }}\n\nTop 5 today:\n{{ $('Code in JavaScript').all().map((i, n) => (n + 1) + '. ' + i.json.title + ' (' + i.json.points + ' pts)').join('\\n') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.discord",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        -192
+      ],
+      "id": "27c24bc9-cf90-43ba-937a-cff8ec0c29df",
+      "name": "Discord Hot Brief ",
+      "webhookId": "59fd2376-073b-4142-9a35-0a9577916a59",
+      "credentials": {
+        "discordWebhookApi": {
+          "id": "y3Lgh348bIk2IToM",
+          "name": "Discord Webhook account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://hn.algolia.com/api/v1/search?tags=front_page",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        224,
+        0
+      ],
+      "id": "6426ed20-0baf-46c1-ba72-4225e9b190d6",
+      "name": "HTTP Request",
+      "onError": "continueErrorOutput"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Alert: Details API Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Discord Hot Brief ",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Discord Quiet Day ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Alert: Search API Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "6cdecb7f-f0fb-4e13-81fb-a1df76b8808d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "2c7c9c50e4eb5ed62d64e5f316a0126539fa7e9a2e1254adf7062b3311b25c65"
+  },
+  "nodeGroups": [],
+  "id": "PRVH2j8fhk4BbDbz",
+  "tags": []
+}
